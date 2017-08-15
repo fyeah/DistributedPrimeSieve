@@ -20,10 +20,12 @@ public class DistributedSieve {
         // if consumer nr_threads. connect to producer activemq broker thing
         // get job of queue. start sieving. message back when done.
         String type = args[0];
-        if(type == "p") {
+        if(type.equals("p")) {
             initProducer();
-        } else if(type == "c") {
+            System.out.println("done");
+        } else if(type.equals("c")) {
             initConsumer();
+            System.out.println("done");
         }
     }
 
@@ -57,6 +59,9 @@ public class DistributedSieve {
             // Tell the producer to send the message
             System.out.println("Sent message: " + message.hashCode()
                     + " : " + Thread.currentThread().getName());
+
+            Thread.sleep(3000);
+
             producer.send(message);
 
             // Clean up
