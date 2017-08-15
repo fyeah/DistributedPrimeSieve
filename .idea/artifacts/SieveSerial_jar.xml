@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="SieveSerial:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/SieveSerial_jar</output-path>
+    <root id="archive" name="SieveSerial.jar">
+      <element id="module-output" name="SieveSerial" />
+    </root>
+  </artifact>
+</component>
