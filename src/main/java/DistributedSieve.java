@@ -19,9 +19,15 @@ public class DistributedSieve {
         //
         // if consumer nr_threads. connect to producer activemq broker thing
         // get job of queue. start sieving. message back when done.
+        String type = args[0];
+        if(type == "p") {
+            initProducer();
+        } else if(type == "c") {
+            initConsumer();
+        }
     }
 
-    public void initProducer() {
+    public static void initProducer() {
         try {
             // Create a ConnectionFactory
             ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(
@@ -45,8 +51,7 @@ public class DistributedSieve {
 
             // Create a messages
             String text = "Hello world! From: "
-                    + Thread.currentThread().getName() + " : "
-                    + this.hashCode();
+                    + Thread.currentThread().getName() + " : Producer";
             TextMessage message = session.createTextMessage(text);
 
             // Tell the producer to send the message
@@ -65,12 +70,12 @@ public class DistributedSieve {
     }
 
 
-    public void initConsumer() {
+    public static void initConsumer() {
         try {
 
             // Create a ConnectionFactory
             ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(
-                    "tcp://yorin-N56VB:61616");
+                    "tcp://52.29.35.197:61616");
 
             // Create a Connection
             Connection connection = connectionFactory.createConnection();
