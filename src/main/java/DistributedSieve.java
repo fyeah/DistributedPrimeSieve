@@ -17,10 +17,11 @@ public class DistributedSieve {
 
     static final String TOPIC = "SievingJobs";
     static final String LOCAL_BROKER_URL = "tcp://localhost:61616";
-    static final String BROKER_URL = "tcp://52.29.35.197:61616";
+    static final String BROKER_URL = "tcp://localhost:61616";
+//    static final String BROKER_URL = "tcp://52.29.35.197:61616";
 
     static int NR_DISTRIBUTIONS = 2;
-    static int SIZE = 1000;
+    static long SIZE = 2000L;
     static int NR_THREADS = 2;
 
 
@@ -41,7 +42,7 @@ public class DistributedSieve {
         String type = args[0];
         if(type.equals("p")) {
             if(args.length == 2) {
-                SIZE = Integer.parseInt(args[1]);
+                SIZE = Long.parseLong(args[1]);
             }
             initProducer();
         } else if(type.equals("c")) {
@@ -55,7 +56,8 @@ public class DistributedSieve {
     public static void initProducer() {
         try {
 
-            ArrayList<Integer> initalPrimes = findPrimes(SIZE);
+            ArrayList<Integer> initalPrimes = findPrimes((int) Math.sqrt(SIZE));
+            initalPrimes.remove(0); // remove 2.
 
 
             ActiveMQConnectionFactory connectionFactory = new ActiveMQConnectionFactory(
@@ -72,24 +74,28 @@ public class DistributedSieve {
             MessageProducer producer = session.createProducer(destination);
             producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
 
+            long distributionSize = SIZE / NR_DISTRIBUTIONS;
+
             for (int i = 0; i < NR_DISTRIBUTIONS; i++) {
                 long firstNumber;
                 long lastNumber;
 
                 if(i == 0) {
-                    firstNumber = 0;
+                    firstNumber = 7; //start at 7. add 2, 3, 5 at the end.
                 } else {
-                    firstNumber = (i*SIZE) + 1;
+                    firstNumber = (i*distributionSize) + 1;
                 }
 
                 if(i == NR_DISTRIBUTIONS-1) {
                     lastNumber = SIZE;
                 } else {
-                    lastNumber = (i+1) * SIZE ;
+                    lastNumber = (i+1) * distributionSize ;
                 }
                 int threadNr = i;
+                System.out.println(firstNumber);
+                System.out.println(lastNumber);
                 SieveJob sieveJob = new SieveJob(firstNumber, lastNumber, initalPrimes);
-                producer.send(session.createObjectMessage((Serializable) sieveJob));
+                producer.send(session.createObjectMessage(sieveJob));
             }
 
 
@@ -164,6 +170,21 @@ public class DistributedSieve {
 
                 long end = System.currentTimeMillis();
                 System.out.println("time taken: " + (end-start));
+
+                long counter = 3;
+                for(ArrayList<PrimesList> threadPrimesLists : result) {
+                    for(PrimesList primesList : threadPrimesLists) {
+
+//                        primesList.printPrimes();
+                        for (int i = 0; i <= primesList.getBitSet().length(); i++) {
+                            if(primesList.getBitSet().get(i)) {
+                                counter++;
+                            }
+                        }
+                    }
+                }
+                System.out.println("nr of primes: " + counter);
+
             } else {
                 System.out.println("RECEIVED OTHER TYPE OF MESSAGE!");
                 System.out.println("Received: " + message);
