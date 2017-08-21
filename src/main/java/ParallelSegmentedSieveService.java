@@ -52,13 +52,7 @@ class SegmentedSieve implements Runnable {
 
     private void init() {
         long diff = lastNumber - firstNumber;
-        long size;
-        if(firstNumber%2 != 0 && lastNumber%2 !=0) {
-            size = ((long) Math.ceil((double) diff/2));
-        } else {
-            size = ((long) Math.ceil((double) diff/2)-1);
-        }
-
+        long size = diff;
 
         if(size >= segmentThreshold) {
             nrOfSegments = (int) Math.ceil(((double) size / segmentThreshold));
@@ -69,9 +63,12 @@ class SegmentedSieve implements Runnable {
         }
 
         primeNumberIndexOffset = firstNumber;
+//        System.out.println(firstNumber);
+//        System.out.println(lastNumber);
         if(primeNumberIndexOffset % 2 != 0) {
             primeNumberIndexOffset--; //index offset has to be uneven because the index should represent an uneven number in the isprime bitset.
         }
+
     }
 
     @Override
@@ -97,13 +94,13 @@ class SegmentedSieve implements Runnable {
             if(i == 0) {
                 segmentFirstNumber = firstNumber;
             } else {
-                segmentFirstNumber = (i * (long) segmentSize)*2 + 2 + primeNumberIndexOffset;
+                segmentFirstNumber = (i * (long) segmentSize) + 1 + primeNumberIndexOffset;
             }
 
             if(i == nrOfSegments-1) {
                 segmentLastNumber = lastNumber;
             } else {
-                segmentLastNumber = ((i+1) * (long) segmentSize)*2 + 1 + primeNumberIndexOffset;
+                segmentLastNumber = ((i+1) * (long) segmentSize) + primeNumberIndexOffset;
             }
 
             sieveSegment(segmentFirstNumber, segmentLastNumber);
@@ -111,23 +108,23 @@ class SegmentedSieve implements Runnable {
     }
 
     private void sieveSegment(long firstNumber, long lastNumber) {
+//        System.out.println(firstNumber);
+//        System.out.println(lastNumber);
         long diff = lastNumber - firstNumber;
-        int size;
-        if(firstNumber%2 != 0 && lastNumber%2 !=0) {
-            size = ((int) Math.ceil((double) diff/2));
-        } else {
-            size = ((int) Math.ceil((double) diff/2)-1);
-        }
+        int size = (int) diff;
+
+//        System.out.println(size);
 
         long segmentIndexOffset = firstNumber;
         if(segmentIndexOffset % 2 != 0) {
-            segmentIndexOffset--; // moet dit..?
+            segmentIndexOffset--;
+            size++;
         }
 
 
         BitSet isPrime = new BitSet(size);
 
-        for (int i = 0; i <= size ; i++) {
+        for (int i = 1; i <= size ; i+=2) {
             isPrime.set(i);
         }
 
@@ -145,13 +142,13 @@ class SegmentedSieve implements Runnable {
             }
 
             for (long j = startJ; (long) j*primeFactor <= lastNumber; j+=2) {
-                isPrime.clear((int) (((long)j*primeFactor - segmentIndexOffset - 1)/2));
+                isPrime.clear((int) ((long)j*primeFactor - segmentIndexOffset));
             }
         }
 
         for (int i = 0; i <= isPrime.length(); i++) {
             if(isPrime.get(i)) {
-                long prime = (long) i*2 + 1 + segmentIndexOffset;
+                long prime = (long) i + segmentIndexOffset;
                 long byteOffset = (long) Math.floor((double) prime / 30);
                 int remainder = (int) (prime % 30);
                 int bitOffset = primeRemainders.indexOf(remainder);
