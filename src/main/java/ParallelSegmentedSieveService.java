@@ -175,7 +175,7 @@ class SegmentedSieve implements Runnable {
 public class ParallelSegmentedSieveService {
 
 //    int NR_THREADS;
-    final static long SIZE = 1000000000;
+    final static long SIZE = 1000000000L;
     static int NR_THREADS = 8;
 
 
