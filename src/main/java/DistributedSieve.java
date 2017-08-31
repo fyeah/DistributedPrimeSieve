@@ -1,13 +1,18 @@
 package main.java;
 
 import main.java.models.PrimesList;
+import main.java.models.PrimesListsResult;
 import main.java.models.SieveJob;
 import org.apache.activemq.ActiveMQConnectionFactory;
+import org.apache.activemq.BlobMessage;
 
 import javax.jms.*;
-import java.io.Serializable;
+import java.io.*;
 import java.util.ArrayList;
 import java.util.BitSet;
+
+
+
 
 
 /**
@@ -15,10 +20,11 @@ import java.util.BitSet;
  */
 public class DistributedSieve {
 
-    static final String TOPIC = "SievingJobs";
+    static final String QUEUE_NAME = "SievingJobs";
+    static final String TOPIC_NAME = "ResultPrimes";
     static final String LOCAL_BROKER_URL = "tcp://localhost:61616";
-    static final String BROKER_URL = "tcp://localhost:61616";
-//    static final String BROKER_URL = "tcp://52.29.35.197:61616";
+//    static final String BROKER_URL = "tcp://localhost:61616";
+    static final String BROKER_URL = "tcp://35.156.159.190:61616";
 
     static int NR_DISTRIBUTIONS = 2;
     static long SIZE = 2000L;
@@ -27,14 +33,8 @@ public class DistributedSieve {
 
     //args[0] p: producer, c: consumer
     //args[1]: if p: size. if c: nr of threads.
+    //args[2]: if p: number of distributions
     public static void main(String[] args) {
-        // parse producer or consumer
-        // init activemq broker
-        // if producer parse size, divide work, add to queue. wait for consumers to be done.
-        //
-        //
-        // if consumer nr_threads. connect to producer activemq broker thing
-        // get job of queue. start sieving. message back when done.
         if(args.length < 1) {
             System.out.println("Provide arguments");
             System.exit(0);
@@ -43,6 +43,10 @@ public class DistributedSieve {
         if(type.equals("p")) {
             if(args.length == 2) {
                 SIZE = Long.parseLong(args[1]);
+            }
+            if(args.length == 3) {
+                SIZE = Long.parseLong(args[1]);
+                NR_DISTRIBUTIONS = Integer.parseInt(args[2]);
             }
             initProducer();
         } else if(type.equals("c")) {
@@ -55,7 +59,7 @@ public class DistributedSieve {
 
     public static void initProducer() {
         try {
-
+            long start = System.currentTimeMillis();
             ArrayList<Integer> initalPrimes = findPrimes((int) Math.sqrt(SIZE));
             initalPrimes.remove(0); // remove 2.
 
@@ -69,7 +73,7 @@ public class DistributedSieve {
             Session session = connection.createSession(false,
                     Session.AUTO_ACKNOWLEDGE);
 
-            Destination destination = session.createQueue(TOPIC);
+            Destination destination = session.createQueue(QUEUE_NAME);
 
             MessageProducer producer = session.createProducer(destination);
             producer.setDeliveryMode(DeliveryMode.NON_PERSISTENT);
@@ -91,7 +95,7 @@ public class DistributedSieve {
                 } else {
                     lastNumber = (i+1) * distributionSize ;
                 }
-                int threadNr = i;
+
                 System.out.println(firstNumber);
                 System.out.println(lastNumber);
                 SieveJob sieveJob = new SieveJob(firstNumber, lastNumber, initalPrimes);
@@ -99,11 +103,66 @@ public class DistributedSieve {
             }
 
 
+            Destination resultDestination = session.createTopic(TOPIC_NAME);
+
+            MessageConsumer resultConsumer = session.createConsumer(resultDestination);
+
+            int received = 0;
+            long counter = 3; // primes 2, 3, 5
+            long biggest;
+
+            while(received != NR_DISTRIBUTIONS) {
+                // Wait for a message
+                Message resultMessage = resultConsumer.receive();
+
+                if (resultMessage instanceof ObjectMessage) {
+                    ObjectMessage objectMessage = (ObjectMessage) resultMessage;
+                    PrimesListsResult primesListsResult = (PrimesListsResult) objectMessage.getObject();
+//                    Byte[] bytes = new Byte[(int)bytesMessage.getBodyLength()];
+//                    bytesMessage.readBytes(bytes);
+//                    ByteArrayInputStream byteArrayInputStream = new ByteArrayInputStream();
+//
+//                    ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+//                    ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
+//                    BufferedOutputStream bufferedOutputStream = new BufferedOutputStream(byteArrayOutputStream);
+//                    bytesMessage.setObjectProperty("JMS_AMQ_SaveStream", bufferedOutputStream);
+//
+//                    objectOutputStream.writeObject(primesListsResult);
+//                    objectOutputStream.flush();
+//                    objectOutputStream.close();
+
+
+//                    PrimesListsResult primesListsResult = (PrimesListsResult) bytesMessage.setObjectProperty();
+                    ArrayList<ArrayList<PrimesList>> result = primesListsResult.getPrimesListsResult();
+
+                    for(ArrayList<PrimesList> threadPrimesLists : result) {
+                        for(PrimesList primesList : threadPrimesLists) {
+                            //                        primesList.printPrimes();
+                            for (int i = 0; i <= primesList.getBitSet().length(); i++) {
+                                if(primesList.getBitSet().get(i)) {
+                                    counter++;
+                                }
+                            }
+                        }
+                    }
+                    received++;
+                } else {
+                    System.out.println("Received different message..!");
+                }
+            }
+
+            long end = System.currentTimeMillis();
+
+
+            System.out.println("nr of primes: " + counter);
+
+            System.out.println("time taken including counting: " + (end-start));
+
             // wait till consumers are done... another queue?
 
             // Clean up
-//            session.close();
-//            connection.close();
+            session.close();
+            connection.close();
 
 
 
@@ -152,7 +211,7 @@ public class DistributedSieve {
                     Session.AUTO_ACKNOWLEDGE);
 
             // Create the destination (Topic or Queue)
-            Destination destination = session.createQueue(TOPIC);
+            Destination destination = session.createQueue(QUEUE_NAME);
 
             // Create a MessageConsumer from the Session to the Topic or
             // Queue
@@ -166,25 +225,39 @@ public class DistributedSieve {
                 SieveJob sieveJob = (SieveJob) objectMessage.getObject();
                 System.out.println("Received. First number: " + sieveJob.getFirstNumer());
 
-                ArrayList<ArrayList<PrimesList>> result = parallelSegmentedSieveService.performSieve(sieveJob);
+                PrimesListsResult primesListsResult = parallelSegmentedSieveService.performSieve(sieveJob);
+
+                Destination resultDestination = session.createTopic(TOPIC_NAME);
+
+                MessageProducer resultProducer = session.createProducer(resultDestination);
+
+//                PrimesListsResult primesListsResult = new PrimesLists(primesListsResult.getPrimesListsResult().get(0));
+
+//                ByteArrayOutputStream byteArrayOutputStream = new ByteArrayOutputStream();
+//                ObjectOutputStream objectOutputStream = new ObjectOutputStream(byteArrayOutputStream);
+//                objectOutputStream.writeObject(primesListsResult);
+//                objectOutputStream.flush();
+//                objectOutputStream.close();
+
+
+//                InputStream inputStream = new ByteArrayInputStream(byteArrayOutputStream.toByteArray());
+//                bytesMessage.writeBytes(byteArrayOutputStream.toByteArray());
+//
+//                BufferedInputStream bufferedInputStream = new BufferedInputStream(inputStream);
+
+//                session.createStreamMessage();
+
+//                BytesMessage bytesMessage = session.createBytesMessage();
+//                bytesMessage.setObjectProperty("JMS_AMQ_InputStream", bufferedInputStream);
+
+//                resultProducer.send(bytesMessage);
+
+                resultProducer.send(session.createObjectMessage(primesListsResult));
+
+//                ArrayList<ArrayList<PrimesList>> result = primesListsResult.getPrimesListsResult();
 
                 long end = System.currentTimeMillis();
                 System.out.println("time taken: " + (end-start));
-
-                long counter = 3;
-                for(ArrayList<PrimesList> threadPrimesLists : result) {
-                    for(PrimesList primesList : threadPrimesLists) {
-
-//                        primesList.printPrimes();
-                        for (int i = 0; i <= primesList.getBitSet().length(); i++) {
-                            if(primesList.getBitSet().get(i)) {
-                                counter++;
-                            }
-                        }
-                    }
-                }
-                System.out.println("nr of primes: " + counter);
-
             } else {
                 System.out.println("RECEIVED OTHER TYPE OF MESSAGE!");
                 System.out.println("Received: " + message);

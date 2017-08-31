@@ -1,5 +1,6 @@
 package main.java.models;
 
+import java.io.Serializable;
 import java.util.Arrays;
 import java.util.BitSet;
 import java.util.List;
@@ -7,7 +8,7 @@ import java.util.List;
 /**
  * Created by yorin on 11-8-17.
  */
-public class PrimesList {
+public class PrimesList implements Serializable {
     private BitSet primes;
     private long indexOffset;
 
@@ -35,5 +36,24 @@ public class PrimesList {
 
     public BitSet getBitSet() {
         return primes;
+    }
+
+    public long getPrimeByIndex(int i) {
+        if(primes.get(i)) {
+            long index = i + indexOffset;
+            long byteOffset = (long) Math.floor((double) index / 8);
+            int remainderIndex = (int) (index % 8);
+            int remainder = (int) primeRemainders.get(remainderIndex);
+
+            long prime = byteOffset * 30 + remainder;
+            System.out.println(prime);
+            return prime;
+        } else {
+            return 0;
+        }
+    }
+
+    public long getLargestPrime() {
+        return 0;
     }
 }

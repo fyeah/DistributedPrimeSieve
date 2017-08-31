@@ -1,6 +1,7 @@
 package main.java;
 
 import main.java.models.PrimesList;
+import main.java.models.PrimesListsResult;
 import main.java.models.SieveJob;
 
 import java.util.*;
@@ -35,8 +36,8 @@ class SegmentedSieve implements Runnable {
 
     private List primeRemainders = Arrays.asList(new Integer[] {1, 7, 11, 13, 17, 19, 23, 29});
 
-    private final int segmentThreshold = 500000;
-//    private final int segmentThreshold = 1000000;
+//    private final int segmentThreshold = 500000;
+    private final int segmentThreshold = 1000000;
 //    private final int segmentThreshold = Integer.MAX_VALUE;
 
 
@@ -177,56 +178,55 @@ class SegmentedSieve implements Runnable {
 // bij 30 * 10^11 gaat het nog goed. Denk heap size!!!
 public class ParallelSegmentedSieveService {
 
-//    int NR_THREADS;
-    final static long SIZE = 1000000000;
-    static int NR_THREADS = 8;
+    int NR_THREADS;
+//    final static long SIZE = 1000000000;
+//    static int NR_THREADS = 4;
 
 
     public ParallelSegmentedSieveService(int nrThreads) {
         NR_THREADS = nrThreads;
     }
 
-    public static void main(String[] args) {
+//    public static void main(String[] args) {
+//
+//        long start = System.currentTimeMillis();
+//        ArrayList<Integer> initalPrimes = findPrimes((int) Math.sqrt(SIZE));
+//        initalPrimes.remove(0); // remove 2..
+//        SieveJob sieveJob = new SieveJob(7L, SIZE, initalPrimes);
+//        ArrayList<ArrayList<PrimesList>> result = performSieve(sieveJob);
+//        long end = System.currentTimeMillis();
+//        System.out.println("time taken: " + (end-start));
+//
+//        long counter = 3; // primes 2, 3, 5
+//        for(ArrayList<PrimesList> threadPrimesLists : result) {
+//            for(PrimesList primesList : threadPrimesLists) {
+//
+////                primesList.printPrimes();
+//
+//                for (int i = 0; i <= primesList.getBitSet().length(); i++) {
+//                    if(primesList.getBitSet().get(i)) {
+//                        counter++;
+//                    }
+//                }
+//            }
+//        }
+//        System.out.println("nr of primes: " + counter);
+//    }
 
-        long start = System.currentTimeMillis();
-        ArrayList<Integer> initalPrimes = findPrimes((int) Math.sqrt(SIZE));
-        initalPrimes.remove(0); // remove 2..
-        SieveJob sieveJob = new SieveJob(7L, SIZE, initalPrimes);
-        ArrayList<ArrayList<PrimesList>> result = performSieve(sieveJob);
-        long end = System.currentTimeMillis();
-        System.out.println("time taken: " + (end-start));
 
-        long counter = 3; // primes 2, 3, 5
-        for(ArrayList<PrimesList> threadPrimesLists : result) {
-            for(PrimesList primesList : threadPrimesLists) {
-
-//                primesList.printPrimes();
-
-                for (int i = 0; i <= primesList.getBitSet().length(); i++) {
-                    if(primesList.getBitSet().get(i)) {
-                        counter++;
-                    }
-                }
-            }
-        }
-        System.out.println("nr of primes: " + counter);
-    }
-
-
-    public static ArrayList<ArrayList<PrimesList>> performSieve(SieveJob sieveJob) {
+    public PrimesListsResult performSieve(SieveJob sieveJob) {
         long firstNumber = sieveJob.getFirstNumer();
         long lastNumber = sieveJob.getLastNumber();
         ArrayList<Integer> primeFactors = sieveJob.getPrimeFactor();
 
-
         ExecutorService executorService = Executors.newFixedThreadPool(NR_THREADS);
         CountDownLatch countDownLatch = new CountDownLatch(NR_THREADS);
 
-        ArrayList<ArrayList<PrimesList>> result = new ArrayList<ArrayList<PrimesList>>(NR_THREADS);
+        PrimesListsResult result = new PrimesListsResult();
 
 //         set initial values so that they can be modified later.
         for (int i = 0; i < NR_THREADS; i++) {
-            result.add(new ArrayList<PrimesList>());
+            result.getPrimesListsResult().add(new ArrayList<PrimesList>());
         }
 
         long diff = lastNumber - firstNumber;
@@ -246,7 +246,7 @@ public class ParallelSegmentedSieveService {
             } else {
                 subLastNumber = firstNumber + (diff/NR_THREADS)*(i+1) ;
             }
-            executorService.submit(new SegmentedSieve(subFirstNumber, subLastNumber, primeFactors, countDownLatch, result.get(i)));
+            executorService.submit(new SegmentedSieve(subFirstNumber, subLastNumber, primeFactors, countDownLatch, result.getPrimesListsResult().get(i)));
         }
         executorService.shutdown();
 
@@ -256,6 +256,7 @@ public class ParallelSegmentedSieveService {
         } catch (InterruptedException e) {
             e.printStackTrace();
         }
+
         return result;
     }
 
